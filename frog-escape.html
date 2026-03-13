@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Frog Escape 🐸</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a1a0a;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; font-family: 'Segoe UI', sans-serif;
+    overflow: hidden; touch-action: none;
+  }
+  #game-wrapper {
+    position: relative; width: 100vmin; height: 100vmin;
+    max-width: 600px; max-height: 600px;
+  }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+  #ui-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  #hud {
+    position: absolute; top: 8px; left: 0; width: 100%;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 12px;
+  }
+  .hud-pill {
+    background: rgba(0,0,0,0.55); border-radius: 20px;
+    padding: 4px 12px; color: #f0e88a; font-size: 13px; font-weight: 700;
+    border: 1.5px solid rgba(255,220,60,0.3);
+    text-shadow: 0 1px 4px #000;
+  }
+  #timer-bar-wrap {
+    position: absolute; bottom: 72px; left: 12px; right: 12px;
+    background: rgba(0,0,0,0.4); border-radius: 8px; height: 8px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  #timer-bar {
+    height: 100%; width: 100%; border-radius: 8px;
+    transition: background 0.5s;
+    background: linear-gradient(90deg, #4ade80, #86efac);
+  }
+  #d-pad {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    display: grid; grid-template-columns: 44px 44px 44px;
+    grid-template-rows: 44px 44px 44px; gap: 3px;
+    pointer-events: all;
+  }
+  .dpad-btn {
+    background: rgba(20,60,20,0.75); border: 1.5px solid rgba(100,200,80,0.4);
+    border-radius: 10px; color: #a8e090; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+    transition: background 0.08s, transform 0.08s;
+  }
+  .dpad-btn:active, .dpad-btn.pressed {
+    background: rgba(60,140,50,0.9); transform: scale(0.92);
+  }
+  .dpad-center { visibility: hidden; }
+  #screen-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    pointer-events: all;
+    background: rgba(0,15,0,0.88);
+    backdrop-filter: blur(3px);
+  }
+  #screen-overlay.hidden { display: none; }
+  .screen-emoji { font-size: 64px; margin-bottom: 12px; animation: bounce 0.6s ease infinite alternate; }
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
+  .screen-title { font-size: 28px; font-weight: 900; color: #a8f060; margin-bottom: 6px;
+    text-shadow: 0 0 20px #4af050; letter-spacing: 1px; }
+  .screen-subtitle { font-size: 14px; color: #7db870; margin-bottom: 24px; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .game-btn {
+    padding: 10px 24px; border-radius: 24px; font-size: 15px; font-weight: 700;
+    border: 2px solid; cursor: pointer; transition: transform 0.1s, opacity 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .game-btn:active { transform: scale(0.95); opacity: 0.85; }
+  .btn-primary { background: #3ddc52; border-color: #6eff80; color: #062a0c; }
+  .btn-secondary { background: transparent; border-color: #4aaa60; color: #80ee90; }
+  #skin-select { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; justify-content: center; }
+  .skin-opt {
+    font-size: 28px; padding: 6px 10px; border-radius: 12px; cursor: pointer;
+    border: 2px solid transparent; transition: border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .skin-opt.active { border-color: #7eff60; background: rgba(100,255,80,0.15); }
+  .coin-row { display: flex; gap: 4px; align-items: center; }
+  #level-info { font-size: 11px; color: #5a8860; text-align: center; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="game-wrapper">
+  <canvas id="canvas" width="600" height="600"></canvas>
+  <div id="ui-overlay">
+    <div id="hud">
+      <div class="hud-pill">Lv <span id="hud-level">1</span></div>
+      <div class="hud-pill coin-row">🪙 <span id="hud-coins">0</span></div>
+      <div class="hud-pill">❤️ <span id="hud-lives">3</span></div>
+    </div>
+    <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
+    <div id="d-pad">
+      <div></div>
+      <div class="dpad-btn" id="btn-up">▲</div>
+      <div></div>
+      <div class="dpad-btn" id="btn-left">◀</div>
+      <div class="dpad-center"></div>
+      <div class="dpad-btn" id="btn-right">▶</div>
+      <div></div>
+      <div class="dpad-btn" id="btn-down">▼</div>
+      <div></div>
+    </div>
+    <div id="level-info" id="level-desc"></div>
+  </div>
+  <div id="screen-overlay">
+    <div class="screen-emoji">🐸</div>
+    <div class="screen-title">FROG ESCAPE</div>
+    <div class="screen-subtitle">Guide the frog to the lily pad — before the hunter catches you!</div>
+    <div id="skin-select">
+      <div class="skin-opt active" data-skin="0">🐸</div>
+      <div class="skin-opt" data-skin="1">🐊</div>
+      <div class="skin-opt" data-skin="2">🦊</div>
+      <div class="skin-opt" data-skin="3">⭐</div>
+    </div>
+    <div class="btn-row">
+      <button class="game-btn btn-primary" id="btn-start">▶ START</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = 600, H = 600;
+const TILE = 40;
+const COLS = W / TILE; // 15
+const ROWS = H / TILE; // 15
+
+const TILE_EMPTY = 0, TILE_WALL = 1, TILE_WATER = 2, TILE_THORN = 3,
+      TILE_MUD = 4, TILE_LOG = 5, TILE_PLATFORM = 6, TILE_COIN = 7,
+      TILE_EXIT = 8, TILE_START = 9;
+
+// Skins
+const SKINS = ['🐸','🐊','🦊','⭐'];
+let selectedSkin = 0;
+
+// Game state
+let state = 'title'; // title | playing | dead | win | gameover
+let level = 1;
+let lives = 3;
+let totalCoins = 0;
+let levelCoins = 0;
+let timeLeft = 60;
+let timeMax = 60;
+let frameId;
+let lastTime = 0;
+
+// Player
+let frog = { x: 1, y: 1, px: 40, py: 40, moving: false, dir: 0, jumpT: 0, alive: true, mudded: 0 };
+let hunter = { x: 13, y: 13, px: 520, py: 520, moveTimer: 0, speed: 1.2 };
+
+// Map
+let mapGrid = [];
+let coins = [];
+let logs = [];
+let platforms = [];
+let exit = {x:13, y:1};
+
+// Input
+let keys = {};
+let moveQueue = [];
+let moveCooldown = 0;
+
+// Particles
+let particles = [];
+
+// Audio context (simple beeps)
+let audioCtx = null;
+function initAudio() {
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+}
+function beep(freq, dur, type='sine', vol=0.15) {
+  if (!audioCtx) return;
+  try {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = freq; o.type = type;
+    g.gain.setValueAtTime(vol, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch(e){}
+}
+function playJump() { beep(400,0.08,'sine',0.1); beep(600,0.1,'sine',0.08); }
+function playPickup() { beep(880,0.06); beep(1100,0.08); }
+function playCatch() { beep(180,0.4,'sawtooth',0.2); }
+function playWin() {
+  [523,659,784,1047].forEach((f,i) => setTimeout(()=>beep(f,0.2),i*100));
+}
+
+// Level definitions
+function makeLevel(lvl) {
+  // Returns grid 15x15
+  const g = Array.from({length: ROWS}, () => Array(COLS).fill(TILE_EMPTY));
+  const coinList = [];
+  const logList = [];
+  const platformList = [];
+
+  // Border walls
+  for(let r=0; r<ROWS; r++) for(let c=0; c<COLS; c++) {
+    if(r===0||r===ROWS-1||c===0||c===COLS-1) g[r][c] = TILE_WALL;
+  }
+
+  // Start and exit
+  g[1][1] = TILE_START;
+  g[1][13] = TILE_EXIT;
+  exit = {x:13, y:1};
+
+  const patterns = [
+    // Level 1 - simple maze
+    () => {
+      [[3,2],[3,3],[3,4],[5,2],[5,3],[7,4],[7,5],[7,6],[9,2],[9,3],[11,8],[11,9],[11,10]].forEach(([r,c]) => g[r][c]=TILE_WALL);
+      [[4,6],[6,8],[8,10],[10,12]].forEach(([r,c]) => coinList.push({x:c,y:r,collected:false}));
+      g[7][2]=TILE_MUD; g[7][3]=TILE_MUD;
+    },
+    // Level 2 - water holes
+    () => {
+      [[3,2],[3,3],[5,5],[5,6],[7,8],[7,9],[9,11],[9,12]].forEach(([r,c]) => g[r][c]=TILE_WALL);
+      [[5,2],[5,3],[6,2],[6,3]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [[9,4],[9,5],[10,4],[10,5]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [[4,7],[6,9],[8,11],[10,13]].forEach(([r,c]) => coinList.push({x:c,y:r,collected:false}));
+      g[3][7]=TILE_MUD; g[3][8]=TILE_MUD; g[4][10]=TILE_THORN;
+    },
+    // Level 3 - thorns + logs
+    () => {
+      [[3,3],[3,4],[3,5],[7,6],[7,7],[11,9],[11,10],[11,11]].forEach(([r,c]) => g[r][c]=TILE_WALL);
+      [[5,2],[6,2],[5,3],[6,3]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [[9,7],[9,8],[10,7],[10,8]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [3,4,5,6].forEach(r => g[r][10]=TILE_THORN);
+      [2,3,4,5].forEach(c => g[6][c]=TILE_THORN);
+      logList.push({x:2, y:5.5, dir:1, speed:0.8, len:2});
+      logList.push({x:7, y:9.5, dir:-1, speed:1.0, len:2});
+      [[4,6],[8,3],[8,12],[12,6]].forEach(([r,c]) => coinList.push({x:c,y:r,collected:false}));
+    },
+    // Level 4 - platforms + everything
+    () => {
+      [[2,4],[2,5],[4,7],[4,8],[6,3],[6,4],[8,10],[8,11],[10,6],[10,7]].forEach(([r,c]) => g[r][c]=TILE_WALL);
+      [[3,2],[4,2],[3,3],[4,3]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [[7,5],[8,5],[7,6],[8,6]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [[11,9],[12,9],[11,10],[12,10]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [5,6,7].forEach(c => g[5][c]=TILE_THORN);
+      [9,10,11].forEach(c => g[9][c]=TILE_THORN);
+      [7,8,9].forEach(r => g[r][3]=TILE_MUD);
+      logList.push({x:3.5, y:3.5, dir:1, speed:1.2, len:2});
+      logList.push({x:7.5, y:11.5, dir:-1, speed:0.9, len:2});
+      platformList.push({x:6, y:5, active:true, timer:0, period:2.5});
+      platformList.push({x:10, y:9, active:false, timer:1.2, period:2.5});
+      [[2,7],[5,11],[9,2],[12,12],[6,8]].forEach(([r,c]) => coinList.push({x:c,y:r,collected:false}));
+    },
+    // Level 5 - hard
+    () => {
+      [[2,3],[2,4],[2,8],[2,9],[4,5],[4,6],[6,2],[6,3],[8,9],[8,10],[10,5],[10,6],[12,3],[12,4]].forEach(([r,c]) => g[r][c]=TILE_WALL);
+      [[3,6],[4,6],[3,7],[4,7]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [[7,2],[8,2],[7,3],[8,3]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [[9,11],[10,11],[9,12],[10,12]].forEach(([r,c]) => g[r][c]=TILE_WATER);
+      [3,4,5].forEach(c => g[5][c]=TILE_THORN);
+      [9,10,11].forEach(c => g[11][c]=TILE_THORN);
+      [5,6,7,8].forEach(r => g[r][8]=TILE_THORN);
+      [3,4,5,6].forEach(r => g[r][11]=TILE_MUD);
+      logList.push({x:3.5, y:6.5, dir:1, speed:1.5, len:2});
+      logList.push({x:7.5, y:7.5, dir:-1, speed:1.3, len:2});
+      logList.push({x:9.5, y:11.5, dir:1, speed:1.0, len:2});
+      platformList.push({x:5, y:4, active:true, timer:0, period:2.0});
+      platformList.push({x:11, y:8, active:false, timer:1.0, period:2.0});
+      platformList.push({x:8, y:12, active:true, timer:0.5, period:1.8});
+      [[2,6],[4,10],[7,11],[10,3],[12,9],[6,6]].forEach(([r,c]) => coinList.push({x:c,y:r,collected:false}));
+    }
+  ];
+
+  const patternFn = patterns[Math.min(lvl-1, patterns.length-1)];
+  patternFn();
+
+  return { g, coinList, logList, platformList };
+}
+
+function startLevel() {
+  const {g, coinList, logList, platformList: pl} = makeLevel(level);
+  mapGrid = g;
+  coins = coinList;
+  logs = logList;
+  platforms = pl;
+  levelCoins = 0;
+  particles = [];
+  timeMax = Math.max(30, 65 - (level-1)*7);
+  timeLeft = timeMax;
+  moveCooldown = 0;
+  moveQueue = [];
+
+  frog = { x:1, y:1, px:TILE*1+TILE/2, py:TILE*1+TILE/2,
+           moving:false, dir:0, jumpT:0, alive:true, mudded:0, onLog:null, dead:false };
+  hunter = { x:13, y:13, px:TILE*13+TILE/2, py:TILE*13+TILE/2,
+             moveTimer:0, speed: 0.8 + level*0.15 };
+
+  document.getElementById('hud-level').textContent = level;
+  document.getElementById('hud-coins').textContent = totalCoins;
+  document.getElementById('hud-lives').textContent = lives;
+  state = 'playing';
+  hideOverlay();
+}
+
+// Pathfinding (BFS for hunter)
+function bfsPath(sx, sy, tx, ty, grid) {
+  const visited = Array.from({length: ROWS}, () => Array(COLS).fill(false));
+  const prev = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+  const q = [[sx, sy]];
+  visited[sy][sx] = true;
+  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+  while(q.length) {
+    const [cx, cy] = q.shift();
+    if(cx===tx && cy===ty) {
+      // Reconstruct
+      let path = [[cx,cy]]; let cur = [cx,cy];
+      while(prev[cur[1]][cur[0]]) { cur = prev[cur[1]][cur[0]]; path.unshift(cur); }
+      return path;
+    }
+    for(const [dx,dy] of dirs) {
+      const nx=cx+dx, ny=cy+dy;
+      if(nx<0||ny<0||nx>=COLS||ny>=ROWS) continue;
+      if(visited[ny][nx]) continue;
+      const t = grid[ny][nx];
+      if(t===TILE_WALL) continue;
+      visited[ny][nx]=true; prev[ny][nx]=[cx,cy]; q.push([nx,ny]);
+    }
+  }
+  return null;
+}
+
+// Drawing helpers
+const COLORS = {
+  empty: '#1a3d1a', wall: '#2d4a20', water: '#1a6080', mud: '#5a3e1e',
+  thorn: '#1a2a0a', log: '#8b5e2d', platform: '#b8a060', coin: '#f0d030',
+  exit: '#2aaa30', start: '#1a5a1a'
+};
+const WALL_PATTERN = '#3a6028';
+const WATER_ANIM_OFFSET = { val: 0 };
+
+function drawTile(r, c, t, dt) {
+  const x = c*TILE, y = r*TILE;
+  // Base ground
+  ctx.fillStyle = COLORS.empty;
+  ctx.fillRect(x, y, TILE, TILE);
+
+  if(t===TILE_WALL) {
+    ctx.fillStyle = COLORS.wall;
+    ctx.fillRect(x,y,TILE,TILE);
+    ctx.fillStyle = WALL_PATTERN;
+    ctx.fillRect(x+4,y+4,TILE-8,TILE-8);
+    // Crack detail
+    ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x+8,y+8); ctx.lineTo(x+16,y+18); ctx.stroke();
+  } else if(t===TILE_WATER) {
+    const wave = Math.sin(WATER_ANIM_OFFSET.val + c*0.8 + r*0.5);
+    ctx.fillStyle = `hsl(${200+wave*10},60%,${30+wave*3}%)`;
+    ctx.fillRect(x,y,TILE,TILE);
+    ctx.fillStyle='rgba(120,220,255,0.15)';
+    const wy = y+TILE/2 + wave*3;
+    ctx.fillRect(x+2, wy, TILE-4, 4);
+  } else if(t===TILE_MUD) {
+    ctx.fillStyle='#4a2e10'; ctx.fillRect(x,y,TILE,TILE);
+    ctx.fillStyle='#6b4020'; ctx.beginPath();
+    for(let i=0;i<3;i++) ctx.arc(x+8+i*12, y+TILE/2+Math.sin(i)*4, 4, 0, Math.PI*2);
+    ctx.fill();
+  } else if(t===TILE_THORN) {
+    ctx.fillStyle='#0d1a08'; ctx.fillRect(x,y,TILE,TILE);
+    ctx.fillStyle='#3a6a10';
+    for(let i=0;i<4;i++) {
+      const tx2=x+5+i*8, ty2=y+TILE-4;
+      ctx.beginPath(); ctx.moveTo(tx2,ty2); ctx.lineTo(tx2+4,ty2-14); ctx.lineTo(tx2+8,ty2); ctx.fill();
+    }
+    ctx.fillStyle='#c0402a';
+    ctx.beginPath(); ctx.arc(x+12,y+8,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+28,y+12,3,0,Math.PI*2); ctx.fill();
+  } else if(t===TILE_EXIT) {
+    // Lily pad
+    ctx.fillStyle='#1a6030'; ctx.fillRect(x,y,TILE,TILE);
+    ctx.fillStyle='#28aa50'; ctx.beginPath();
+    ctx.arc(x+TILE/2,y+TILE/2,TILE/2-4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#50dd70'; ctx.beginPath();
+    ctx.arc(x+TILE/2,y+TILE/2,TILE/2-8,0,Math.PI*2); ctx.fill();
+    // Flower
+    ctx.fillStyle='#f0d040';
+    ctx.beginPath(); ctx.arc(x+TILE/2,y+TILE/2,5,0,Math.PI*2); ctx.fill();
+    // Glow pulse
+    const pulse = 0.4+0.3*Math.sin(Date.now()*0.004);
+    ctx.strokeStyle=`rgba(80,255,100,${pulse})`; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x+TILE/2,y+TILE/2,TILE/2-2,0,Math.PI*2); ctx.stroke();
+  } else if(t===TILE_START) {
+    ctx.fillStyle='#1a4020'; ctx.fillRect(x,y,TILE,TILE);
+    ctx.fillStyle='rgba(100,255,80,0.15)'; ctx.fillRect(x+4,y+4,TILE-8,TILE-8);
+  }
+}
+
+function drawLog(log) {
+  const x = log.px - log.len*TILE/2;
+  const y = log.py - TILE/2 + 6;
+  const w = log.len*TILE;
+  const h = TILE - 12;
+  ctx.fillStyle='#7a4e20'; ctx.beginPath();
+  roundRect(x,y,w,h,6); ctx.fill();
+  ctx.fillStyle='#9b6e40';
+  for(let i=0;i<log.len*2;i++) {
+    ctx.beginPath(); ctx.arc(x+i*(w/(log.len*2))+8, y+h/2, 3,0,Math.PI*2); ctx.fill();
+  }
+  ctx.strokeStyle='#5a3010'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(x+4,y+3); ctx.lineTo(x+w-4,y+3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+4,y+h-3); ctx.lineTo(x+w-4,y+h-3); ctx.stroke();
+}
+
+function drawPlatform(p) {
+  if(!p.active) return;
+  const x=p.px-TILE/2+4, y=p.py-6, w=TILE-8, h=12;
+  ctx.fillStyle='#c0a050'; ctx.beginPath(); roundRect(x,y,w,h,4); ctx.fill();
+  ctx.strokeStyle='#e0c070'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+function drawCoin(coin) {
+  if(coin.collected) return;
+  const x=coin.px, y=coin.py;
+  const bob = Math.sin(Date.now()*0.005+coin.x)*3;
+  ctx.fillStyle='#f5c020';
+  ctx.beginPath(); ctx.arc(x,y+bob,8,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff8a0';
+  ctx.beginPath(); ctx.arc(x-2,y+bob-2,3,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#c09000'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(x,y+bob,8,0,Math.PI*2); ctx.stroke();
+}
+
+function drawFrog(f) {
+  if(f.dead) return;
+  const x=f.px, y=f.py;
+  const jumpOff = f.moving ? -Math.sin(f.jumpT*Math.PI)*12 : 0;
+  const skin = SKINS[selectedSkin];
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(x, y+16, 12, 5, 0, 0, Math.PI*2); ctx.fill();
+  // Body
+  ctx.font=`${TILE-6}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(skin, x, y+jumpOff-2);
+  // Mud effect
+  if(f.mudded>0) {
+    ctx.fillStyle='rgba(100,60,10,0.4)';
+    ctx.beginPath(); ctx.ellipse(x, y+jumpOff, 14, 14, 0,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawHunter(h) {
+  const x=h.px, y=h.py;
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(x, y+16, 13, 5, 0, 0, Math.PI*2); ctx.fill();
+  // Body (angry face)
+  ctx.font=`${TILE-4}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('🧙', x, y-2);
+  // Anger aura when close
+  const dx=frog.px-h.px, dy=frog.py-h.py;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<80) {
+    const alpha=0.6*(1-dist/80);
+    ctx.strokeStyle=`rgba(255,60,0,${alpha})`; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y-2,22,0,Math.PI*2); ctx.stroke();
+  }
+}
+
+function drawParticles() {
+  for(const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+function spawnParticles(x, y, color, n=6) {
+  for(let i=0;i<n;i++) {
+    const angle=Math.random()*Math.PI*2, spd=1+Math.random()*3;
+    particles.push({x,y,vx:Math.cos(angle)*spd,vy:Math.sin(angle)*spd-2,
+      r:2+Math.random()*4, life:1, color, decay:0.04+Math.random()*0.03});
+  }
+}
+
+function roundRect(x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+
+function getTile(gx, gy) {
+  if(gx<0||gy<0||gx>=COLS||gy>=ROWS) return TILE_WALL;
+  return mapGrid[gy][gx];
+}
+
+function isBlocked(gx, gy) {
+  const t = getTile(gx,gy);
+  return t===TILE_WALL || t===TILE_WATER || t===TILE_THORN;
+}
+
+function canMoveOn(gx, gy) {
+  const t = getTile(gx, gy);
+  return t !== TILE_WALL && t !== TILE_WATER && t !== TILE_THORN;
+}
+
+function processInput(dt) {
+  if(moveCooldown>0) { moveCooldown-=dt; return; }
+  if(frog.moving) return;
+
+  let dx=0, dy=0;
+  if(keys['ArrowUp']||keys['w']||keys['W']) dy=-1;
+  else if(keys['ArrowDown']||keys['s']||keys['S']) dy=1;
+  else if(keys['ArrowLeft']||keys['a']||keys['A']) dx=-1;
+  else if(keys['ArrowRight']||keys['d']||keys['D']) dx=1;
+  else if(moveQueue.length) { const m=moveQueue.shift(); dx=m[0]; dy=m[1]; }
+
+  if(dx===0&&dy===0) return;
+
+  const nx=frog.x+dx, ny=frog.y+dy;
+  if(!canMoveOn(nx,ny)) {
+    beep(200,0.05,'square',0.05); return;
+  }
+
+  frog.moving=true; frog.jumpT=0;
+  frog.targetX=nx; frog.targetY=ny;
+  frog.startPX=frog.px; frog.startPY=frog.py;
+  frog.targetPX=nx*TILE+TILE/2; frog.targetPY=ny*TILE+TILE/2;
+  frog.dir=Math.atan2(dy,dx);
+  playJump();
+
+  // Mud slows
+  const isMud = getTile(nx,ny)===TILE_MUD;
+  frog.mudded = isMud ? 0.4 : 0;
+  moveCooldown = frog.mudded>0 ? 0.25 : 0;
+}
+
+let hunterPath = null;
+let hunterPathTimer = 0;
+
+function updateHunter(dt) {
+  hunter.moveTimer += dt;
+  const moveInterval = Math.max(0.25, 0.6 - (level-1)*0.06);
+
+  hunterPathTimer -= dt;
+  if(hunterPathTimer <= 0) {
+    hunterPath = bfsPath(hunter.x, hunter.y, frog.x, frog.y, mapGrid);
+    hunterPathTimer = 0.4;
+  }
+
+  if(hunter.moveTimer >= moveInterval) {
+    hunter.moveTimer = 0;
+    if(hunterPath && hunterPath.length > 1) {
+      const next = hunterPath[1];
+      // Don't move into water/thorn (hunter can go through mud though)
+      if(getTile(next[0],next[1]) !== TILE_WALL && getTile(next[0],next[1]) !== TILE_WATER &&
+         getTile(next[0],next[1]) !== TILE_THORN) {
+        hunter.x = next[0]; hunter.y = next[1];
+        hunterPath = null; // will recalculate
+      }
+    }
+  }
+  // Smooth px/py
+  hunter.px += (hunter.x*TILE+TILE/2 - hunter.px) * 10 * dt;
+  hunter.py += (hunter.y*TILE+TILE/2 - hunter.py) * 10 * dt;
+}
+
+function updateFrog(dt) {
+  if(frog.moving) {
+    frog.jumpT = Math.min(frog.jumpT + dt * 6, 1);
+    frog.px = frog.startPX + (frog.targetPX-frog.startPX)*frog.jumpT;
+    frog.py = frog.startPY + (frog.targetPY-frog.startPY)*frog.jumpT;
+    if(frog.jumpT >= 1) {
+      frog.x = frog.targetX; frog.y = frog.targetY;
+      frog.px = frog.targetPX; frog.py = frog.targetPY;
+      frog.moving = false;
+      // Check coin
+      coins.forEach(c => {
+        if(!c.collected && c.x===frog.x && c.y===frog.y) {
+          c.collected=true; levelCoins++; totalCoins++;
+          spawnParticles(frog.px,frog.py,'#f5c020',8);
+          playPickup();
+          document.getElementById('hud-coins').textContent = totalCoins;
+        }
+      });
+      // Check exit
+      if(frog.x===exit.x && frog.y===exit.y) {
+        winLevel();
+      }
+    }
+  }
+  // Log riding
+  frog.onLog = null;
+  for(const log of logs) {
+    if(Math.abs(frog.py - log.py) < TILE*0.6 && Math.abs(frog.px - log.px) < log.len*TILE/2) {
+      frog.onLog = log;
+    }
+  }
+}
+
+function updateLogs(dt) {
+  for(const log of logs) {
+    log.x += log.dir * log.speed * dt;
+    log.px = log.x * TILE;
+    // Bounce at walls
+    if(log.px < TILE*2 || log.px > TILE*(COLS-2)) {
+      log.dir *= -1;
+    }
+    if(frog.onLog === log) {
+      frog.px += log.dir * log.speed * TILE * dt;
+      frog.x = Math.round((frog.px - TILE/2) / TILE);
+      // Fell into water if moved off edge
+      const ft = getTile(frog.x, frog.y);
+      if(ft === TILE_WATER) {
+        killFrog('splash');
+      }
+    }
+    // compute py
+    log.py = log.y * TILE;
+  }
+}
+
+function updatePlatforms(dt) {
+  for(const p of platforms) {
+    p.timer += dt;
+    if(p.timer >= p.period) { p.timer=0; p.active=!p.active; }
+    p.px = p.x*TILE+TILE/2; p.py = p.y*TILE+TILE/2;
+    // If frog is on platform and it disappears
+    if(!p.active && frog.x===p.x && frog.y===p.y) {
+      killFrog('fall');
+    }
+  }
+}
+
+function checkCollisions() {
+  // Hunter catch
+  const dx = frog.px-hunter.px, dy = frog.py-hunter.py;
+  if(Math.sqrt(dx*dx+dy*dy) < TILE*0.7) {
+    killFrog('caught');
+  }
+}
+
+function killFrog(reason) {
+  if(frog.dead) return;
+  frog.dead = true;
+  playCatch();
+  spawnParticles(frog.px, frog.py, '#ff6040', 12);
+  lives--;
+  document.getElementById('hud-lives').textContent = lives;
+  setTimeout(() => {
+    if(lives <= 0) showGameOver();
+    else showDead(reason);
+  }, 600);
+}
+
+function winLevel() {
+  state='win';
+  playWin();
+  spawnParticles(frog.px,frog.py,'#80ff60',16);
+  showOverlay('win');
+}
+
+// Timer
+let timerInterval;
+function startTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    if(state!=='playing') return;
+    timeLeft = Math.max(0, timeLeft-1);
+    const bar = document.getElementById('timer-bar');
+    const pct = timeLeft/timeMax;
+    bar.style.width = (pct*100)+'%';
+    bar.style.background = pct>0.5 ? 'linear-gradient(90deg,#4ade80,#86efac)' :
+                           pct>0.25 ? 'linear-gradient(90deg,#facc15,#fde68a)' :
+                                      'linear-gradient(90deg,#ef4444,#f87171)';
+    if(timeLeft<=0) killFrog('timeout');
+  },1000);
+}
+
+function showOverlay(type) {
+  const el = document.getElementById('screen-overlay');
+  el.classList.remove('hidden');
+  const emoji = el.querySelector('.screen-emoji');
+  const title = el.querySelector('.screen-title');
+  const sub = el.querySelector('.screen-subtitle');
+  const btnRow = el.querySelector('.btn-row');
+  const skinSel = document.getElementById('skin-select');
+
+  if(type==='win') {
+    emoji.textContent='🎉';
+    title.textContent = level>=5 ? 'YOU WIN!' : `LEVEL ${level} CLEAR!`;
+    sub.textContent = `Coins collected: 🪙 ${levelCoins}  |  Total: 🪙 ${totalCoins}`;
+    skinSel.style.display='none';
+    btnRow.innerHTML = level>=5
+      ? `<button class="game-btn btn-primary" onclick="restartGame()">▶ PLAY AGAIN</button>`
+      : `<button class="game-btn btn-primary" onclick="nextLevel()">NEXT LEVEL ▶</button>
+         <button class="game-btn btn-secondary" onclick="restartLevel()">↺ RETRY</button>`;
+  } else if(type==='dead') {
+    emoji.textContent='💀';
+    title.textContent='CAUGHT!';
+    sub.textContent = `${lives} lives remaining — keep going!`;
+    skinSel.style.display='none';
+    btnRow.innerHTML=`<button class="game-btn btn-primary" onclick="restartLevel()">↺ TRY AGAIN</button>`;
+  } else if(type==='gameover') {
+    emoji.textContent='😵';
+    title.textContent='GAME OVER';
+    sub.textContent=`Total coins: 🪙 ${totalCoins}`;
+    skinSel.style.display='none';
+    btnRow.innerHTML=`<button class="game-btn btn-primary" onclick="restartGame()">▶ NEW GAME</button>`;
+  } else {
+    // title
+    emoji.textContent='🐸';
+    title.textContent='FROG ESCAPE';
+    sub.textContent='Guide the frog to the lily pad — before the hunter catches you!';
+    skinSel.style.display='flex';
+    btnRow.innerHTML=`<button class="game-btn btn-primary" id="btn-start-inner">▶ START</button>`;
+    document.getElementById('btn-start-inner')?.addEventListener('click', ()=>{
+      initAudio(); startLevel(); startTimer();
+    });
+  }
+}
+
+function hideOverlay() {
+  document.getElementById('screen-overlay').classList.add('hidden');
+}
+function showDead(reason) { state='dead'; showOverlay('dead'); }
+function showGameOver() { state='gameover'; showOverlay('gameover'); clearInterval(timerInterval); }
+function nextLevel() { level++; hideOverlay(); startLevel(); startTimer(); }
+function restartLevel() { hideOverlay(); startLevel(); startTimer(); }
+function restartGame() { level=1; lives=3; totalCoins=0; hideOverlay(); startLevel(); startTimer(); }
+
+// Main loop
+function gameLoop(ts) {
+  const dt = Math.min((ts - lastTime)/1000, 0.05);
+  lastTime = ts;
+  WATER_ANIM_OFFSET.val += dt*2;
+
+  ctx.clearRect(0,0,W,H);
+  // Background
+  ctx.fillStyle='#0e2a0e'; ctx.fillRect(0,0,W,H);
+  // Draw bg deco
+  for(let i=0;i<20;i++) {
+    ctx.fillStyle=`rgba(30,80,30,${0.04+0.02*Math.sin(ts*0.001+i)})`;
+    ctx.beginPath(); ctx.arc(i*33, 300+Math.sin(i*0.8+ts*0.0005)*60, 40+i%3*15,0,Math.PI*2); ctx.fill();
+  }
+
+  // Tiles
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) drawTile(r,c,mapGrid[r][c],dt);
+
+  // Platforms
+  platforms.forEach(p => drawPlatform(p));
+  // Logs
+  logs.forEach(l => drawLog(l));
+  // Coins
+  coins.forEach(c => {
+    c.px = c.x*TILE+TILE/2; c.py = c.y*TILE+TILE/2;
+    drawCoin(c);
+  });
+
+  if(state==='playing') {
+    updateLogs(dt);
+    updatePlatforms(dt);
+    processInput(dt);
+    updateFrog(dt);
+    updateHunter(dt);
+    checkCollisions();
+    // Update particles
+    particles = particles.filter(p=>p.life>0);
+    particles.forEach(p => {
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life-=p.decay;
+    });
+  }
+
+  drawHunter(hunter);
+  drawFrog(frog);
+  drawParticles();
+
+  frameId = requestAnimationFrame(gameLoop);
+}
+
+// Controls
+document.addEventListener('keydown', e => { keys[e.key]=true; });
+document.addEventListener('keyup', e => { keys[e.key]=false; });
+
+function dpadPress(dx,dy) {
+  if(state!=='playing') return;
+  moveQueue.push([dx,dy]);
+}
+document.getElementById('btn-up').addEventListener('touchstart', e=>{e.preventDefault();dpadPress(0,-1);});
+document.getElementById('btn-down').addEventListener('touchstart', e=>{e.preventDefault();dpadPress(0,1);});
+document.getElementById('btn-left').addEventListener('touchstart', e=>{e.preventDefault();dpadPress(-1,0);});
+document.getElementById('btn-right').addEventListener('touchstart', e=>{e.preventDefault();dpadPress(1,0);});
+document.getElementById('btn-up').addEventListener('click', ()=>dpadPress(0,-1));
+document.getElementById('btn-down').addEventListener('click', ()=>dpadPress(0,1));
+document.getElementById('btn-left').addEventListener('click', ()=>dpadPress(-1,0));
+document.getElementById('btn-right').addEventListener('click', ()=>dpadPress(1,0));
+
+// Skin selection
+document.querySelectorAll('.skin-opt').forEach(el => {
+  el.addEventListener('click', ()=>{
+    document.querySelectorAll('.skin-opt').forEach(e=>e.classList.remove('active'));
+    el.classList.add('active');
+    selectedSkin = parseInt(el.dataset.skin);
+  });
+});
+
+// Start button (title screen)
+document.getElementById('btn-start').addEventListener('click', ()=>{
+  initAudio(); startLevel(); startTimer();
+});
+
+// Swipe gesture
+let touchStart={x:0,y:0};
+canvas.addEventListener('touchstart', e=>{
+  touchStart={x:e.touches[0].clientX, y:e.touches[0].clientY};
+},{passive:true});
+canvas.addEventListener('touchend', e=>{
+  if(state!=='playing') return;
+  const dx=e.changedTouches[0].clientX-touchStart.x;
+  const dy=e.changedTouches[0].clientY-touchStart.y;
+  const adx=Math.abs(dx), ady=Math.abs(dy);
+  if(Math.max(adx,ady)<10) return;
+  if(adx>ady) moveQueue.push([dx>0?1:-1,0]);
+  else moveQueue.push([0,dy>0?1:-1]);
+},{passive:true});
+
+// Initial grid (empty for title screen)
+mapGrid = Array.from({length:ROWS},()=>Array(COLS).fill(TILE_EMPTY));
+for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+  if(r===0||r===ROWS-1||c===0||c===COLS-1) mapGrid[r][c]=TILE_WALL;
+coins=[]; logs=[]; platforms=[];
+frog = {x:1,y:1,px:60,py:60,moving:false,dir:0,jumpT:0,alive:true,mudded:0,dead:true};
+hunter = {x:13,y:13,px:540,py:540,moveTimer:0,speed:0};
+
+requestAnimationFrame(t => { lastTime=t; requestAnimationFrame(gameLoop); });
+</script>
+</body>
+</html>
