@@ -1,4 +1,4 @@
-name: Build APK
+name: Build HTML App APK
 
 on:
   push:
@@ -9,16 +9,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
         with:
-          distribution: temurin
-          java-version: '17'
+          node-version: 18
 
-      - name: Give Gradle permission
-        run: chmod +x gradlew
+      - name: Install Cordova
+        run: npm install -g cordova
 
-      - name: Build APK
-        run: ./gradlew assembleDebug
+      - name: Create Cordova App
+        run: |
+          cordova create myapp com.example.myapp MyApp
+          cd myapp
+          cordova platform add android
+          rm -rf www/*
+          cp -r ../* www/
+          cordova build android
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: myapp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
